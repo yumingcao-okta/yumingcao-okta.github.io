@@ -255,7 +255,7 @@
 
 .qtip-youtube .qtip-titlebar {
   background-color: #4A4A4A;
-  background-color: rgba(0, 0, 0, 0);
+  background-color: transparent;
 }
 
 .qtip-youtube .qtip-content {
@@ -6383,7 +6383,7 @@ x:-o-prefocus, .qtip .qtip-tip {
 
 #okta-sign-in .beacon-blank {
   background-image: none;
-  background-color: #fff;
+  background-color: transparent;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -6802,12 +6802,14 @@ x:-o-prefocus, .qtip .qtip-tip {
   text-align: center;
 }
 
-#okta-sign-in .enroll-u2f .u2f-instructions ol {
+#okta-sign-in .enroll-u2f .u2f-instructions ol,
+#okta-sign-in .enroll-webauthn .u2f-instructions ol {
   list-style: decimal;
   margin-left: 15px;
 }
 
-#okta-sign-in .enroll-u2f .u2f-instructions ol li {
+#okta-sign-in .enroll-u2f .u2f-instructions ol li,
+#okta-sign-in .enroll-webauthn .u2f-instructions ol li {
   margin-bottom: 15px;
 }
 
@@ -7029,29 +7031,39 @@ x:-o-prefocus, .qtip .qtip-tip {
 }
 
 #okta-sign-in .verify-u2f-form .o-form-fieldset-container p,
-#okta-sign-in .enroll-u2f-form .o-form-fieldset-container p {
+#okta-sign-in .enroll-u2f-form .o-form-fieldset-container p,
+#okta-sign-in .verify-webauthn-form .o-form-fieldset-container p,
+#okta-sign-in .enroll-webauthn-form .o-form-fieldset-container p {
   margin-bottom: 15px;
   text-align: center;
 }
 
 #okta-sign-in .verify-u2f-form .o-form-content > .o-form-error-container,
-#okta-sign-in .enroll-u2f-form .o-form-content > .o-form-error-container {
+#okta-sign-in .enroll-u2f-form .o-form-content > .o-form-error-container,
+#okta-sign-in .verify-webauthn-form .o-form-content > .o-form-error-container,
+#okta-sign-in .enroll-webauthn-form .o-form-content > .o-form-error-container {
   margin-bottom: 20px;
 }
 
 #okta-sign-in .verify-u2f-form .okta-waiting-spinner,
-#okta-sign-in .enroll-u2f-form .okta-waiting-spinner {
+#okta-sign-in .enroll-u2f-form .okta-waiting-spinner,
+#okta-sign-in .verify-webauthn-form .okta-waiting-spinner,
+#okta-sign-in .enroll-webauthn-form .okta-waiting-spinner {
   margin-top: 20px;
   margin-bottom: 20px;
 }
 
 #okta-sign-in .verify-u2f-form .u2f-devices-images,
-#okta-sign-in .enroll-u2f-form .u2f-devices-images {
+#okta-sign-in .enroll-u2f-form .u2f-devices-images,
+#okta-sign-in .verify-webauthn-form .u2f-devices-images,
+#okta-sign-in .enroll-webauthn-form .u2f-devices-images {
   display: inline-block;
 }
 
 #okta-sign-in .verify-u2f-form .u2f-devices-images .u2f-usb,
-#okta-sign-in .enroll-u2f-form .u2f-devices-images .u2f-usb {
+#okta-sign-in .enroll-u2f-form .u2f-devices-images .u2f-usb,
+#okta-sign-in .verify-webauthn-form .u2f-devices-images .u2f-usb,
+#okta-sign-in .enroll-webauthn-form .u2f-devices-images .u2f-usb {
   background: url("../img/icons/mfa/u2f_usb.png") no-repeat center;
   height: 109px;
   width: 148px;
@@ -7060,7 +7072,9 @@ x:-o-prefocus, .qtip .qtip-tip {
 }
 
 #okta-sign-in .verify-u2f-form .u2f-devices-images .u2f-bluetooth,
-#okta-sign-in .enroll-u2f-form .u2f-devices-images .u2f-bluetooth {
+#okta-sign-in .enroll-u2f-form .u2f-devices-images .u2f-bluetooth,
+#okta-sign-in .verify-webauthn-form .u2f-devices-images .u2f-bluetooth,
+#okta-sign-in .enroll-webauthn-form .u2f-devices-images .u2f-bluetooth {
   background: url("../img/icons/mfa/u2f_bluetooth.png") no-repeat center;
   height: 109px;
   width: 148px;
@@ -7088,7 +7102,7 @@ x:-o-prefocus, .qtip .qtip-tip {
   margin-top: 30px;
 }
 
-#okta-sign-in .registration-container .content {
+#okta-sign-in .registration-container .content-container {
   padding: 30px 42px;
   -moz-transition: padding-top 0.4s;
   -webkit-transition: padding-top 0.4s;

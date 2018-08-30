@@ -24,6 +24,21 @@ define(function () {
     }
     return hash >>> 0;
   };
-  
+
+  fn.base64UrlSafeToBase64 = function (str) {
+    return str.replace(new RegExp("_", 'g'), "/").replace(new RegExp("-", 'g'), "+");
+  };
+
+  fn.binToStr = function (bin) {
+    return btoa(new Uint8Array(bin).reduce(
+      (s, byte) => s + String.fromCharCode(byte), ''
+    ));
+  };
+
+  fn.strToBin = function (str) {
+    str = this.base64UrlSafeToBase64(str);
+    return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+  };
+
   return fn;
 });

@@ -10,45 +10,25 @@
  * See the License for the specific language governing permissions and limitations under the License.
  */
 
-/* global u2f */
 /* eslint complexity:[2, 9] */
 
 define([
   'okta',
   'util/FormController',
   'util/FormType',
+  'util/CryptoUtil',
+  'util/webauthn',
   'views/shared/FooterSignout',
   'vendor/lib/q',
   'util/FactorUtil',
-  'views/mfa-verify/HtmlErrorMessageView',
-  'u2f-api-polyfill'
+  'views/mfa-verify/HtmlErrorMessageView'
 ],
-function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErrorMessageView) {
+function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q, FactorUtil, HtmlErrorMessageView) {
 
   var _ = Okta._;
 
-  function getErrorMessageKeyByCode(errorCode, isOneFactor) {
-    switch (errorCode){
-    case 1: // OTHER_ERROR
-      return isOneFactor ? 'u2f.error.other.oneFactor' : 'u2f.error.other';
-    case 2: // BAD_REQUEST
-    case 3: // CONFIGURATION_UNSUPPORTED
-      return isOneFactor ? 'u2f.error.badRequest.oneFactor' : 'u2f.error.badRequest';
-    case 4: // DEVICE_INELIGIBLE
-      return isOneFactor ? 'u2f.error.unsupported.oneFactor' : 'u2f.error.unsupported';
-    case 5: // TIMEOUT
-      return 'u2f.error.timeout';
-    }
-  }
-
-  function binToStr(bin) {
-    return btoa(new Uint8Array(bin).reduce(
-        (s, byte) => s + String.fromCharCode(byte), ''
-    ));
-  }
-
   return FormController.extend({
-    className: 'mfa-verify verify-u2f',
+    className: 'mfa-verify verify-webauthn',
     Model: {
       props: {
         rememberDevice: 'boolean'
@@ -71,46 +51,19 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
           });
 
           var self = this;
-          return factor.verify()
-          .then(function (transaction) {
-            var factorData = transaction.factor;
-            var appId = factorData.profile.appId;
-            var registeredKeys = [{version: factorData.profile.version, keyHandle: factorData.profile.credentialId }];
+          return factor.verify().then(function (transaction) {
             self.trigger('request');
+            if (navigator.credentials.create != null) {
+              var factorData = transaction.factor;
+              var appId = factorData.challenge.extensions['appid'];
+              var registeredKeys = [{version: 'U2F_V2', keyHandle: factorData.profile.credentialId }];
+              self.trigger('request');
 
-            var deferred = Q.defer();
-
-            if (navigator.credentials.get != null) {
-              var idBytes = Uint8Array.from(atob(factorData.profile.credentialId.replace(new RegExp("_", 'g'), "/").replace(new RegExp("-", 'g'), "+")), c=>c.charCodeAt(0));
-              var challengeBytes = Uint8Array.from(atob(factorData.challenge.challenge.replace(new RegExp("_", 'g'), "/").replace(new RegExp("-", 'g'), "+")), c=> c.charCodeAt(0));
-              var options = factorData.challenge;
-
-              options.allowCredentials = [{
-                type: "public-key",
-                id: idBytes
-              }];
-              options.challenge = challengeBytes;
-
-              navigator.credentials.get({ "publicKey": options }).then(function (assertion) {
-                console.log(assertion);
-                var rememberDevice = !!self.get('rememberDevice');
-                return factor.verify({
-                  clientData: binToStr(assertion.response.clientDataJSON),
-                  authenticatorData: binToStr(assertion.response.authenticatorData),
-                  signatureData: binToStr(assertion.response.signature),
-                  rememberDevice: rememberDevice
-                })
-                .then(deferred.resolve);
-              }).catch(function (err) {
-                console.log(err);
-              });
-            } else {
-              u2f.sign(appId, factorData.challenge.nonce, registeredKeys, function (data) {
+              var deferred = Q.defer();
+              u2f.sign(appId, factorData.challenge.challenge, registeredKeys, function (data) {
                 self.trigger('errors:clear');
                 if (data.errorCode && data.errorCode !== 0) {
-                  var isOneFactor = self.options.appState.get('factors').length === 1;
-                  deferred.reject({xhr: {responseJSON:
-                  {errorSummary: Okta.loc(getErrorMessageKeyByCode(data.errorCode, isOneFactor), 'login')}}});
+                  deferred.reject({xhr: {responseJSON: {errorSummary: 'error' + data.errorCode}}});
                 } else {
                   var rememberDevice = !!self.get('rememberDevice');
                   return factor.verify({
@@ -121,9 +74,33 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
                   .then(deferred.resolve);
                 }
               });
-            }
+              return deferred.promise;
+            } else {
+              var options = _.extend({}, transaction.factor.challenge, {
+                allowCredentials: [{
+                  type: "public-key",
+                  id: CryptoUtil.strToBin(transaction.factor.profile.credentialId)
+                }],
+                challenge: CryptoUtil.strToBin(transaction.factor.challenge.challenge)
+              });
 
-            return deferred.promise;
+              return new Q(navigator.credentials.get({"publicKey": options}))
+                .then(function (assertion) {
+                  var rememberDevice = !!self.get('rememberDevice');
+                  return factor.verify({
+                    clientData: CryptoUtil.binToStr(assertion.response.clientDataJSON),
+                    authenticatorData: CryptoUtil.binToStr(assertion.response.authenticatorData),
+                    signatureData: CryptoUtil.binToStr(assertion.response.signature),
+                    rememberDevice: rememberDevice
+                  })
+                })
+                .fail(function (error) {
+                  self.trigger('errors:clear');
+                  throw {
+                    xhr: {responseJSON: {errorSummary: error.message}}
+                  };
+                });
+            }
           });
         });
       }
@@ -132,13 +109,12 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
     Form: {
       autoSave: true,
       hasSavingState: false,
-      title: _.partial(Okta.loc, 'factor.webauthn', 'login'),
-      className: 'verify-u2f-form',
+      title: _.partial(Okta.loc, 'factor.u2f', 'login'),
+      className: 'verify-webauthn-form',
       noCancelButton: true,
       save: _.partial(Okta.loc, 'verify.u2f.retry', 'login'),
       noButtonBar: function () {
-        //return !window.hasOwnProperty('u2f');
-        return false;
+        return !webauthn.isNewApiAvailable();
       },
       modelEvents: {
         'request': '_startEnrollment',
@@ -146,20 +122,11 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
       },
 
       formChildren: function () {
-        var result = [];
+        var children = [];
 
-        //if (!window.hasOwnProperty('u2f')) {
-        //  var errorMessageKey = 'u2f.error.factorNotSupported';
-        //  if (this.options.appState.get('factors').length === 1) {
-        //    errorMessageKey = 'u2f.error.factorNotSupported.oneFactor';
-        //  }
-        //  result.push(FormType.View(
-        //    {View: new HtmlErrorMessageView({message: Okta.loc(errorMessageKey, 'login')})},
-        //    {selector: '.o-form-error-container'}
-        //  ));
-        //}
-        //else {
-          result.push(FormType.View({
+        // TODO: handle non-webauthn browser flow
+        if (webauthn.isNewApiAvailable()) {
+          children.push(FormType.View({
             View: '\
             <div class="u2f-verify-text">\
               <p>{{i18n code="verify.u2f.instructions" bundle="login"}}</p>\
@@ -167,10 +134,20 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
               <div data-se="u2f-waiting" class="okta-waiting-spinner"></div>\
             </div>'
           }));
-        //}
+        }
+        else {
+          var errorMessageKey = 'u2f.error.factorNotSupported';
+          if (this.options.appState.get('factors').length === 1) {
+            errorMessageKey = 'u2f.error.factorNotSupported.oneFactor';
+          }
+          children.push(FormType.View(
+              {View: new HtmlErrorMessageView({message: Okta.loc(errorMessageKey, 'login')})},
+              {selector: '.o-form-error-container'}
+          ));
+        }
 
         if (this.options.appState.get('allowRememberDevice')) {
-          result.push(FormType.Input({
+          children.push(FormType.Input({
             label: false,
             'label-top': true,
             placeholder: this.options.appState.get('rememberDeviceLabel'),
@@ -180,27 +157,27 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
           }));
         }
 
-        return result;
+        return children;
       },
 
       postRender: function () {
         _.defer(_.bind(function () {
-          if (window.hasOwnProperty('u2f')) {
+          if (navigator.credentials.create != null) {
             this.model.save();
           }
           else {
-            this.$('[data-se="u2f-waiting"]').addClass('hide');
+            this.$('[data-se="u2f-waiting"]').hide();
           }
         }, this));
       },
 
       _startEnrollment: function () {
-        this.$('.okta-waiting-spinner').removeClass('hide');
+        this.$('.okta-waiting-spinner').show();
         this.$('.o-form-button-bar').hide();
       },
 
       _stopEnrollment: function () {
-        this.$('.okta-waiting-spinner').addClass('hide');
+        this.$('.okta-waiting-spinner').hide();
         this.$('.o-form-button-bar').show();
       }
     },

@@ -85,7 +85,7 @@ function (Okta, FormType, FormController, Footer, Q, HtmlErrorMessageView) {
             } else {
               deferred.resolve(transaction.activate({
                 registrationData: data.registrationData,
-                version: "U2F_V2",
+                version: data.version,
                 challenge: data.challenge,
                 clientData: data.clientData
               }));

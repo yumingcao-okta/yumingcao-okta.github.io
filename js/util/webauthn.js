@@ -62,7 +62,10 @@ function (Okta, Q) {
     makeCredential: makeCredential,
     getAssertion: getAssertion,
     isAvailable: function () {
-      return window.hasOwnProperty('msCredentials') || navigator.credentials.get != null;
+      return window.hasOwnProperty('msCredentials');
+    },
+    isNewApiAvailable: function () {
+      return navigator && navigator.credentials && navigator.credentials.create;
     }
   };
 });

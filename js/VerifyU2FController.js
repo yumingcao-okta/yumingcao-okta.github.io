@@ -72,13 +72,12 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
             self.trigger('request');
 
             var deferred = Q.defer();
-
             u2f.sign(appId, factorData.challenge.nonce, registeredKeys, function (data) {
               self.trigger('errors:clear');
               if (data.errorCode && data.errorCode !== 0) {
                 var isOneFactor = self.options.appState.get('factors').length === 1;
                 deferred.reject({xhr: {responseJSON:
-                {errorSummary: Okta.loc(getErrorMessageKeyByCode(data.errorCode, isOneFactor), 'login')}}});
+                  {errorSummary: Okta.loc(getErrorMessageKeyByCode(data.errorCode, isOneFactor), 'login')}}});
               } else {
                 var rememberDevice = !!self.get('rememberDevice');
                 return factor.verify({
@@ -89,7 +88,6 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
                 .then(deferred.resolve);
               }
             });
-
             return deferred.promise;
           });
         });

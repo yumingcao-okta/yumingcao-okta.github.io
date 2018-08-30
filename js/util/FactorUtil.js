@@ -40,12 +40,6 @@ function (Okta, TimeUtil) {
       iconClassName: 'mfa-u2f',
       sortOrder: 2
     },
-    'WEBAUTHN': {
-      label: 'factor.webauthn',
-      description: 'factor.webauthn.description',
-      iconClassName: 'mfa-u2f',
-      sortOrder: 2
-    },
     'WINDOWS_HELLO': {
       label: 'factor.windowsHello',
       description: 'factor.windowsHello.signin.description',
@@ -161,12 +155,12 @@ function (Okta, TimeUtil) {
       return 'QUESTION';
     }
     if (provider === 'FIDO' && factorType === 'webauthn') {
-      //if (this.settings.get('features.webauthn')) {
+      if (this.settings.get('features.webauthn')) {
         return 'U2F';
-      //} else {
-        //return 'WINDOWS_HELLO';
-      //}
-    }
+      } else {
+        return 'WINDOWS_HELLO';
+      }
+    };
     if (provider === 'FIDO' && factorType === 'u2f') {
       return 'U2F';
     }
@@ -186,21 +180,21 @@ function (Okta, TimeUtil) {
   };
 
   fn.getFactorLabel = function (provider, factorType) {
-    var key = factorData[fn.getFactorName(provider, factorType)].label;
+    var key = factorData[fn.getFactorName.apply(this, [provider, factorType])].label;
     return Okta.loc(key, 'login');
   };
 
   fn.getFactorDescription = function (provider, factorType) {
-    var key = factorData[fn.getFactorName(provider, factorType)].description;
+    var key = factorData[fn.getFactorName.apply(this, [provider, factorType])].description;
     return Okta.loc(key, 'login');
   };
 
   fn.getFactorIconClassName = function (provider, factorType) {
-    return factorData[fn.getFactorName(provider, factorType)].iconClassName;
+    return factorData[fn.getFactorName.apply(this, [provider, factorType])].iconClassName;
   };
 
   fn.getFactorSortOrder = function (provider, factorType) {
-    return factorData[fn.getFactorName(provider, factorType)].sortOrder;
+    return factorData[fn.getFactorName.apply(this, [provider, factorType])].sortOrder;
   };
 
   fn.getRememberDeviceValue = function (appState) {
