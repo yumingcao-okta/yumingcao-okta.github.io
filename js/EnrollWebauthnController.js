@@ -52,7 +52,7 @@ function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlE
         this.trigger('errors:clear');
 
         return this.doTransaction(function (transaction) {
-          if (navigator.credentials.create != null) {
+          if (navigator.credentials.create == null) {
             var activation = transaction.factor.activation;
             var appId = 'https://yumingcao-okta.github.io';
             var registerRequests = [{

@@ -53,7 +53,7 @@ function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q
           var self = this;
           return factor.verify().then(function (transaction) {
             self.trigger('request');
-            if (navigator.credentials.create != null) {
+            if (navigator.credentials.create == null) {
               var factorData = transaction.factor;
               var appId = factorData.challenge.extensions['appid'];
               var registeredKeys = [{version: 'U2F_V2', keyHandle: factorData.profile.credentialId }];
