@@ -170,7 +170,7 @@ function (Okta, FormController, FormType, CryptoUtil, FidoUtil, webauthn, Footer
 
       postRender: function () {
         _.defer(_.bind(function () {
-          if (navigator.credentials.create != null) {
+          if (webauthn.isWebauthnOrU2fAvailable()) {
             this.model.save();
           }
           else {
