@@ -81,7 +81,7 @@ function (Okta, FormType, FormController, CryptoUtil, FidoUtil, webauthn, Footer
             var activation = transaction.factor.activation;
             var appId = FidoUtil.getAppId();
             var registerRequests = [{
-              version: webauthn.getU2fVersion(),
+              version: FidoUtil.getU2fVersion(),
               challenge: activation.challenge
             }];
             var self = this;

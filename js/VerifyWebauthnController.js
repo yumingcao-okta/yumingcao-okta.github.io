@@ -84,7 +84,7 @@ function (Okta, FormController, FormType, CryptoUtil, FidoUtil, webauthn, Footer
               // verify via legacy u2f js for non webauhtn supported browser
               var factorData = transaction.factor;
               var appId = factorData.challenge.extensions['appid'];
-              var registeredKeys = [{version: webauthn.getU2fVersion(), keyHandle: factorData.profile.credentialId}];
+              var registeredKeys = [{version: FidoUtil.getU2fVersion(), keyHandle: factorData.profile.credentialId}];
               self.trigger('request');
 
               var deferred = Q.defer();
