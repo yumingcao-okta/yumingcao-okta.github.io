@@ -16,29 +16,15 @@ define([
   'okta',
   'util/FormType',
   'util/FormController',
+  'util/FidoUtil',
   'views/enroll-factors/Footer',
   'vendor/lib/q',
   'views/mfa-verify/HtmlErrorMessageView',
   'u2f-api-polyfill'
 ],
-function (Okta, FormType, FormController, Footer, Q, HtmlErrorMessageView) {
+function (Okta, FormType, FormController, FidoUtil, Footer, Q, HtmlErrorMessageView) {
 
   var _ = Okta._;
-
-  function getErrorMessageKeyByCode(errorCode) {
-    switch (errorCode) {
-    default:
-    case 1:
-      return 'u2f.error.other';
-    case 2:
-    case 3:
-      return 'u2f.error.badRequest';
-    case 4:
-      return 'u2f.error.unsupported';
-    case 5:
-      return 'u2f.error.timeout';
-    }
-  }
 
   return FormController.extend({
     className: 'enroll-u2f',
@@ -80,7 +66,7 @@ function (Okta, FormType, FormController, Footer, Q, HtmlErrorMessageView) {
             self.trigger('errors:clear');
             if (data.errorCode && data.errorCode !== 0) {
               deferred.reject({
-                xhr: {responseJSON: {errorSummary: Okta.loc(getErrorMessageKeyByCode(data.errorCode), 'login')}}
+                xhr: {responseJSON: {errorSummary: Okta.loc(FidoUtil.getU2fEnrollErrorMessageKeyByCode(data.errorCode), 'login')}}
               });
             } else {
               deferred.resolve(transaction.activate({

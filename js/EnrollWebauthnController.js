@@ -15,12 +15,13 @@ define([
   'util/FormType',
   'util/FormController',
   'util/CryptoUtil',
+  'util/FidoUtil',
   'util/webauthn',
   'views/enroll-factors/Footer',
   'vendor/lib/q',
   'views/mfa-verify/HtmlErrorMessageView'
 ],
-function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlErrorMessageView) {
+function (Okta, FormType, FormController, CryptoUtil, FidoUtil, webauthn, Footer, Q, HtmlErrorMessageView) {
 
   var _ = Okta._;
 
@@ -52,30 +53,8 @@ function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlE
         this.trigger('errors:clear');
 
         return this.doTransaction(function (transaction) {
-          if (navigator.credentials.create == null) {
-            var activation = transaction.factor.activation;
-            var appId = 'https://yumingcao-okta.github.io';
-            var registerRequests = [{
-              version: 'U2F_V2',
-              challenge: activation.challenge
-            }];
-            var self = this;
-            var deferred = Q.defer();
-            u2f.register(appId, registerRequests, [], function (data) {
-              self.trigger('errors:clear');
-              if (data.errorCode && data.errorCode !== 0) {
-                deferred.reject({
-                  xhr: { responseJSON: { errorSummary: 'data.errorCode: ' + data.errorCode } }
-                });
-              } else {
-                deferred.resolve(transaction.activate({
-                  attestation: data.registrationData,
-                  clientData: data.clientData
-                }));
-              }
-            });
-            return deferred.promise;
-          } else {
+          // enroll via browser webauthn js
+          if (webauthn.isNewApiAvailable()) {
             var activation = transaction.factor.activation;
             var options = _.extend({}, activation, {
               challenge: CryptoUtil.strToBin(activation.challenge),
@@ -85,7 +64,6 @@ function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlE
                 displayName: activation.user.displayName
               }
             });
-
             return new Q(navigator.credentials.create({publicKey: options}))
               .then(function (newCredential) {
                 return transaction.activate({
@@ -98,6 +76,30 @@ function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlE
                   xhr: {responseJSON: {errorSummary: error.message}}
                 };
               });
+          } else {
+            // verify via legacy u2f js for non webauthn supported browser
+            var activation = transaction.factor.activation;
+            var appId = FidoUtil.getAppId();
+            var registerRequests = [{
+              version: webauthn.getU2fVersion(),
+              challenge: activation.challenge
+            }];
+            var self = this;
+            var deferred = Q.defer();
+            u2f.register(appId, registerRequests, [], function (data) {
+              self.trigger('errors:clear');
+              if (data.errorCode && data.errorCode !== 0) {
+                deferred.reject({
+                  xhr: {responseJSON: {errorSummary: Okta.loc(FidoUtil.getU2fEnrollErrorMessageKeyByCode(data.errorCode), 'login')}}
+                });
+              } else {
+                deferred.resolve(transaction.activate({
+                  attestation: data.registrationData,
+                  clientData: data.clientData
+                }));
+              }
+            });
+            return deferred.promise;
           }
         });
       }
@@ -111,7 +113,7 @@ function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlE
       autoSave: true,
       className: 'enroll-webauthn-form',
       noButtonBar: function () {
-        return !webauthn.isNewApiAvailable();
+        return !webauthn.isWebauthnOrU2fAvailable();
       },
       modelEvents: {
         'request': '_startEnrollment',
@@ -120,8 +122,7 @@ function (Okta, FormType, FormController, CryptoUtil, webauthn, Footer, Q, HtmlE
       formChildren: function () {
         var children = [];
 
-        // TODO: handle non-webauthn browser flow
-        if (webauthn.isNewApiAvailable()) {
+        if (webauthn.isWebauthnOrU2fAvailable()) {
           //There is html in enroll.u2f.general2 in our properties file, reason why is unescaped
           children.push(FormType.View({
             View:

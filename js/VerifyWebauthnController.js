@@ -17,13 +17,14 @@ define([
   'util/FormController',
   'util/FormType',
   'util/CryptoUtil',
+  'util/FidoUtil',
   'util/webauthn',
   'views/shared/FooterSignout',
   'vendor/lib/q',
   'util/FactorUtil',
   'views/mfa-verify/HtmlErrorMessageView'
 ],
-function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q, FactorUtil, HtmlErrorMessageView) {
+function (Okta, FormController, FormType, CryptoUtil, FidoUtil, webauthn, FooterSignout, Q, FactorUtil, HtmlErrorMessageView) {
 
   var _ = Okta._;
 
@@ -53,29 +54,8 @@ function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q
           var self = this;
           return factor.verify().then(function (transaction) {
             self.trigger('request');
-            if (navigator.credentials.create == null) {
-              var factorData = transaction.factor;
-              var appId = factorData.challenge.extensions['appid'];
-              var registeredKeys = [{version: 'U2F_V2', keyHandle: factorData.profile.credentialId }];
-              self.trigger('request');
-
-              var deferred = Q.defer();
-              u2f.sign(appId, factorData.challenge.challenge, registeredKeys, function (data) {
-                self.trigger('errors:clear');
-                if (data.errorCode && data.errorCode !== 0) {
-                  deferred.reject({xhr: {responseJSON: {errorSummary: 'error' + data.errorCode}}});
-                } else {
-                  var rememberDevice = !!self.get('rememberDevice');
-                  return factor.verify({
-                    clientData: data.clientData,
-                    signatureData: data.signatureData,
-                    rememberDevice: rememberDevice
-                  })
-                  .then(deferred.resolve);
-                }
-              });
-              return deferred.promise;
-            } else {
+            if (webauthn.isNewApiAvailable()) {
+              // verify via browser webauthn js
               var options = _.extend({}, transaction.factor.challenge, {
                 allowCredentials: [{
                   type: "public-key",
@@ -100,6 +80,35 @@ function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q
                     xhr: {responseJSON: {errorSummary: error.message}}
                   };
                 });
+            } else {
+              // verify via legacy u2f js for non webauhtn supported browser
+              var factorData = transaction.factor;
+              var appId = factorData.challenge.extensions['appid'];
+              var registeredKeys = [{version: webauthn.getU2fVersion(), keyHandle: factorData.profile.credentialId}];
+              self.trigger('request');
+
+              var deferred = Q.defer();
+              u2f.sign(appId, factorData.challenge.challenge, registeredKeys, function (data) {
+                self.trigger('errors:clear');
+                if (data.errorCode && data.errorCode !== 0) {
+                  var isOneFactor = self.options.appState.get('factors').length === 1;
+                  deferred.reject({
+                    xhr: {
+                      responseJSON: {
+                        errorSummary: Okta.loc(FidoUtil.getU2fVerifyErrorMessageKeyByCode(data.errorCode, isOneFactor), 'login')
+                      }
+                    }
+                  });
+                } else {
+                  var rememberDevice = !!self.get('rememberDevice');
+                  return factor.verify({
+                    clientData: data.clientData,
+                    signatureData: data.signatureData,
+                    rememberDevice: rememberDevice
+                  }).then(deferred.resolve);
+                }
+              });
+              return deferred.promise;
             }
           });
         });
@@ -114,7 +123,7 @@ function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q
       noCancelButton: true,
       save: _.partial(Okta.loc, 'verify.u2f.retry', 'login'),
       noButtonBar: function () {
-        return !webauthn.isNewApiAvailable();
+        return !webauthn.isWebauthnOrU2fAvailable();
       },
       modelEvents: {
         'request': '_startEnrollment',
@@ -124,8 +133,7 @@ function (Okta, FormController, FormType, CryptoUtil, webauthn, FooterSignout, Q
       formChildren: function () {
         var children = [];
 
-        // TODO: handle non-webauthn browser flow
-        if (webauthn.isNewApiAvailable()) {
+        if (webauthn.isWebauthnOrU2fAvailable()) {
           children.push(FormType.View({
             View: '\
             <div class="u2f-verify-text">\

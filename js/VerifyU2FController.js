@@ -20,26 +20,13 @@ define([
   'views/shared/FooterSignout',
   'vendor/lib/q',
   'util/FactorUtil',
+  'util/FidoUtil',
   'views/mfa-verify/HtmlErrorMessageView',
   'u2f-api-polyfill'
 ],
-function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErrorMessageView) {
+function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, FidoUtil, HtmlErrorMessageView) {
 
   var _ = Okta._;
-
-  function getErrorMessageKeyByCode(errorCode, isOneFactor) {
-    switch (errorCode){
-    case 1: // OTHER_ERROR
-      return isOneFactor ? 'u2f.error.other.oneFactor' : 'u2f.error.other';
-    case 2: // BAD_REQUEST
-    case 3: // CONFIGURATION_UNSUPPORTED
-      return isOneFactor ? 'u2f.error.badRequest.oneFactor' : 'u2f.error.badRequest';
-    case 4: // DEVICE_INELIGIBLE
-      return isOneFactor ? 'u2f.error.unsupported.oneFactor' : 'u2f.error.unsupported';
-    case 5: // TIMEOUT
-      return 'u2f.error.timeout';
-    }
-  }
 
   return FormController.extend({
     className: 'mfa-verify verify-u2f',
@@ -77,7 +64,7 @@ function (Okta, FormController, FormType, FooterSignout, Q, FactorUtil, HtmlErro
               if (data.errorCode && data.errorCode !== 0) {
                 var isOneFactor = self.options.appState.get('factors').length === 1;
                 deferred.reject({xhr: {responseJSON:
-                  {errorSummary: Okta.loc(getErrorMessageKeyByCode(data.errorCode, isOneFactor), 'login')}}});
+                  {errorSummary: Okta.loc(FidoUtil.getU2fVerifyErrorMessageKeyByCode(data.errorCode, isOneFactor), 'login')}}});
               } else {
                 var rememberDevice = !!self.get('rememberDevice');
                 return factor.verify({

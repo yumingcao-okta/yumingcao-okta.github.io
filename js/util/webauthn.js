@@ -66,6 +66,9 @@ function (Okta, Q) {
     },
     isNewApiAvailable: function () {
       return navigator && navigator.credentials && navigator.credentials.create;
+    },
+    isWebauthnOrU2fAvailable: function () {
+      return this.isNewApiAvailable() || window.hasOwnProperty('u2f');
     }
   };
 });
